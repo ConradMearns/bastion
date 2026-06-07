@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bastion — Host Status</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+  }
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+  }
+  p.subtitle {
+    color: var(--muted);
+    font-size: 0.875rem;
+    margin-bottom: 1.5rem;
+  }
+  .status-bar {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .status-pill {
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .pill-healthy { background: rgba(63,185,80,0.15); color: var(--green); }
+  .pill-warning { background: rgba(210,153,34,0.15); color: var(--yellow); }
+  .pill-down    { background: rgba(248,81,73,0.15); color: var(--red); }
+  .pill-total   { background: rgba(88,166,255,0.15); color: var(--accent); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  td { font-size: 0.875rem; }
+  tr:hover { background: var(--surface); }
+  .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+  }
+  .dot-healthy { background: var(--green); }
+  .dot-warning { background: var(--yellow); }
+  .dot-down    { background: var(--red); }
+  .empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--muted);
+  }
+  .error-banner {
+    background: rgba(248,81,73,0.1);
+    border: 1px solid rgba(248,81,73,0.3);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    color: var(--red);
+    font-size: 0.875rem;
+    display: none;
+  }
+  .refresh {
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-align: right;
+    margin-top: 1rem;
+  }
+</style>
+</head>
+<body>
+<h1>🛡️ Bastion</h1>
+<p class="subtitle">Host health dashboard</p>
+
+<div class="error-banner" id="error"></div>
+
+<div class="status-bar">
+  <span class="status-pill pill-total" id="total">0 hosts</span>
+  <span class="status-pill pill-healthy" id="healthy">0 healthy</span>
+  <span class="status-pill pill-warning" id="warning">0 warning</span>
+  <span class="status-pill pill-down" id="down">0 down</span>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Host</th>
+      <th>Status</th>
+      <th>CPU</th>
+      <th>Memory</th>
+      <th>Disk</th>
+      <th>Uptime</th>
+      <th>Last Seen</th>
+    </tr>
+  </thead>
+  <tbody id="table-body">
+    <tr>
+      <td colspan="7" class="empty">Loading…</td>
+    </tr>
+  </tbody>
+</table>
+
+<p class="refresh" id="refresh-info">Auto-refresh every 30s</p>
+
+<script>
+const API_URL = 'http://[2a01:4ff:1f0:690::1]:8000/health';
+
+function formatUptime(seconds) {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const parts = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (h > 0) parts.push(`${h}h`);
+  parts.push(`${m}m`);
+  return parts.join(' ');
+}
+
+function formatTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleString();
+}
+
+function percentBar(pct) {
+  const color = pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--yellow)' : 'var(--green)';
+  return `<span style="color:${color}">${pct.toFixed(0)}%</span>`;
+}
+
+async function fetchHealth() {
+  const errorEl = document.getElementById('error');
+  errorEl.style.display = 'none';
+
+  try {
+    const resp = await fetch(API_URL);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const hosts = await resp.json();
+
+    const tbody = document.getElementById('table-body');
+    if (hosts.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No hosts reporting</td></tr>';
+    } else {
+      tbody.innerHTML = hosts.map(h => `
+        <tr>
+          <td><strong>${h.hostname}</strong></td>
+          <td><span class="status-dot dot-${h.status}"></span>${h.status}</td>
+          <td>${percentBar(h.cpu_percent)}</td>
+          <td>${percentBar(h.memory_percent)}</td>
+          <td>${percentBar(h.disk_percent)}</td>
+          <td>${formatUptime(h.uptime_seconds)}</td>
+          <td>${formatTime(h.last_seen)}</td>
+        </tr>
+      `).join('');
+    }
+
+    // Update counts
+    const counts = { healthy: 0, warning: 0, down: 0 };
+    hosts.forEach(h => counts[h.status]++);
+    document.getElementById('total').textContent = `${hosts.length} host${hosts.length !== 1 ? 's' : ''}`;
+    document.getElementById('healthy').textContent = `${counts.healthy} healthy`;
+    document.getElementById('warning').textContent = `${counts.warning} warning`;
+    document.getElementById('down').textContent = `${counts.down} down`;
+    document.getElementById('refresh-info').textContent =
+      `Last updated: ${new Date().toLocaleTimeString()} · Auto-refresh every 30s`;
+  } catch (e) {
+    errorEl.textContent = `Connection error: ${e.message}`;
+    errorEl.style.display = 'block';
+  }
+}
+
+fetchHealth();
+setInterval(fetchHealth, 30000);
+</script>
+</body>
+</html>
