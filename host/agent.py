@@ -67,6 +67,7 @@ def main():
                 json=data,
                 headers={"Authorization": f"Bearer {token}"},
                 timeout=10,
+                verify=False,  # self-signed cert on bastion
             )
             if resp.status_code == 200:
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] OK — "

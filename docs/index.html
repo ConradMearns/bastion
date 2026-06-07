@@ -107,6 +107,10 @@
 <h1>🛡️ Bastion</h1>
 <p class="subtitle">Host health dashboard</p>
 
+<p style="background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:6px;padding:0.5rem 0.75rem;font-size:0.8rem;color:var(--accent);margin-bottom:1rem;display:none" id="cert-banner">
+  ⚠️ First visit? <a href="https://[2a01:4ff:1f0:690::1]/health" target="_blank" style="color:var(--accent)">Accept the self-signed cert</a>, then refresh.
+</p>
+
 <div class="error-banner" id="error"></div>
 
 <div class="status-bar">
@@ -198,6 +202,9 @@ async function fetchHealth() {
     document.getElementById('refresh-info').textContent =
       `Last updated: ${new Date().toLocaleTimeString()} · Auto-refresh every 30s`;
   } catch (e) {
+    if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
+      document.getElementById('cert-banner').style.display = 'block';
+    }
     errorEl.textContent = `Connection error: ${e.message}`;
     errorEl.style.display = 'block';
   }
