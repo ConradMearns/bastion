@@ -1,0 +1,43 @@
+#cloud-config
+
+write_files:
+  - path: /etc/bastion/.env
+    permissions: "0600"
+    content: |
+      BASTION_JWT_SECRET=411e6dc3e5697e42c936e7e528c5be847cab4e1a62a385e5164ac1b13d1c5532
+
+  - path: /etc/systemd/system/bastion.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Bastion Health API
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User=root
+      WorkingDirectory=/opt/bastion
+      EnvironmentFile=/etc/bastion/.env
+      ExecStart=/root/.local/bin/uv run uvicorn main:app --host :: --port 8000
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+
+packages:
+  - curl
+  - python3
+  - python3-venv
+  - python3-dev
+  - build-essential
+
+runcmd:
+  - mkdir -p /opt/bastion
+  - echo __BASTION_TARBALL__ | base64 -d | tar xzf - -C /opt/bastion
+  - curl -LsSf https://astral.sh/uv/install.sh | sh
+  - cd /opt/bastion && /root/.local/bin/uv sync
+  - systemctl daemon-reload
+  - systemctl enable bastion.service
+  - systemctl start bastion.service
