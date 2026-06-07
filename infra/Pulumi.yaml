@@ -1,0 +1,4 @@
+name: bastion
+runtime:
+  name: python
+description: Bastion host on Hetzner Cloud
