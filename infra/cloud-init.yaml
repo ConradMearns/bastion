@@ -19,7 +19,7 @@ write_files:
       User=root
       WorkingDirectory=/opt/bastion
       EnvironmentFile=/etc/bastion/.env
-      ExecStart=/root/.local/bin/uv run uvicorn main:app --host :: --port 8000
+      ExecStart=/root/.local/bin/uv run uvicorn main:app --host 127.0.0.1 --port 8000
       Restart=always
       RestartSec=5
 
@@ -27,17 +27,11 @@ write_files:
       WantedBy=multi-user.target
 
 packages:
-  - curl
   - python3
   - python3-venv
   - python3-dev
   - build-essential
+  - caddy
 
 runcmd:
-  - mkdir -p /opt/bastion
-  - echo __BASTION_TARBALL__ | base64 -d | tar xzf - -C /opt/bastion
   - curl -LsSf https://astral.sh/uv/install.sh | sh
-  - cd /opt/bastion && /root/.local/bin/uv sync
-  - systemctl daemon-reload
-  - systemctl enable bastion.service
-  - systemctl start bastion.service

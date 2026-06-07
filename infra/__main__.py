@@ -1,9 +1,6 @@
 """Bastion host on Hetzner Cloud — cpx11, us-west (Hillsboro), IPv6 only."""
 
-import base64
-import io
 import os
-import tarfile
 import pulumi
 import pulumi_hcloud as hcloud
 
@@ -18,23 +15,9 @@ ssh_key = hcloud.SshKey(
     public_key=public_key,
 )
 
-# --- Package bastion app as base64 tarball ---
-bastion_dir = os.path.join(os.path.dirname(__file__), "..", "bastion")
-buf = io.BytesIO()
-with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-    for root, dirs, files in os.walk(bastion_dir):
-        dirs[:] = [d for d in dirs if d not in (".venv", "__pycache__")]
-        for fname in files:
-            if fname.endswith(".pyc"):
-                continue
-            full = os.path.join(root, fname)
-            arcname = os.path.relpath(full, bastion_dir)
-            tar.add(full, arcname=arcname)
-bastion_tarball_b64 = base64.b64encode(buf.getvalue()).decode()
-
 # --- Cloud-init ---
 with open("cloud-init.yaml") as f:
-    user_data = f.read().replace("__BASTION_TARBALL__", bastion_tarball_b64)
+    user_data = f.read()
 
 # --- Firewall ---
 firewall = hcloud.Firewall(
@@ -50,7 +33,7 @@ firewall = hcloud.Firewall(
         hcloud.FirewallRuleArgs(
             direction="in",
             protocol="tcp",
-            port="8000",
+            port="443",
             source_ips=["::/0"],
         ),
         hcloud.FirewallRuleArgs(
@@ -75,7 +58,6 @@ server = hcloud.Server(
     ssh_keys=[ssh_key.id],
     firewall_ids=[firewall.id],
     user_data=user_data,
-    # no volumes
 )
 
 # --- Outputs ---

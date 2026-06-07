@@ -1,14 +1,18 @@
 """Bastion FastAPI app — health report collector and status endpoint."""
 
+import os
 from datetime import datetime, timezone
 from typing import Dict
 
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from auth import verify_token, create_token
 from models import HealthReport, HostStatus, status_from_age
+
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = FastAPI(title="Bastion Health API")
 
